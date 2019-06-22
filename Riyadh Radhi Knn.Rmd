@@ -1,0 +1,157 @@
+---
+title: "Riyadh Radhi Knn HomeWork Report"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+The following report will try to construct `K Nearest Neighbour ` that will predict my **attrition**
+
+### 1.Step One
+
+First, I will load all the requried libraries.
+
+
+```{r, message= FALSE, warning=FALSE}
+library(MASS)
+library(dplyr)
+library(ggplot2)
+library(rtf)
+library(scales)
+library(caret)
+library(class)
+library(pROC)
+```
+
+
+### 2. Step Two
+
+Then I will read the data and do the seed and select the columns we want 
+
+```{r}
+df <- read.csv("Attrition.csv", stringsAsFactors = F)
+
+set.seed(2019)
+
+dfNew <- subset(df, select = c(Attrition,Age,DistanceFromHome,HourlyRate,
+                               JobSatisfaction,PerformanceRating,
+                               YearsAtCompany,PercentSalaryHike,
+                               TotalWorkingYears,TrainingTimesLastYear,
+                               YearsInCurrentRole,YearsSinceLastPromotion,
+                               YearsWithCurrManager))
+
+```
+
+### 3. Step Three 
+
+I will then Standardize selected variables and dividing the data 
+
+```{r}
+dfNewScaled <- scale(dfNew[,2:13])
+dfPartition <- createDataPartition(dfNew$Attrition, p = .7,
+                                   list = FALSE,
+                                   times = 1)
+
+Train <- dfNew[dfPartition,-1]
+Test <- dfNew[-dfPartition,-1]
+
+```
+
+
+### 4. Step Four
+
+I will run the knn algorithim now  
+
+```{r}
+test_atr<-dfNew[-dfPartition,"Attrition"]
+
+
+
+myKnn <- knn(Train, Test, dfNew[dfPartition, "Attrition"], k= floor(sqrt(nrow(Train))), prob = TRUE)
+
+test_atr<-dfNew[-dfPartition,"Attrition"]
+
+```
+
+
+### Testing Accuracy
+
+I will test the accuarcy of my knn using table and mean and auc
+
+```{r}
+table(myKnn, test_atr )
+
+mean(myKnn == test_atr)
+
+auc(as.vector(test_atr),attributes(myKnn)$prob)
+```
+
+
+### 5. Step Five 
+
+So our  mean  equals to 0.84 and the AUC  equals to 0.8577 and our tabke shows that we have 203 + 20 = 223 right decesions out of 263 in total. This means our accuracy is 0.88, so yes, the model will be good to predict who stays and who goes out from the company. 
+
+
+### 6. Step Six
+
+Now I will add new employment and do the knn model for him and see the probability that he will stay or not in the company 
+
+```{r}
+new.emp <-c(Age = 40, DistanceFromHome = 3, HourlyRate = 20,JobSatisfaction = 2, 
+            PerformanceRating = 3,  YearsAtCompany = 8,PercentSalaryHike = 2, TotalWorkingYears = 10, 
+            TrainingTimesLastYear = 1,YearsInCurrentRole = 5, YearsSinceLastPromotion = 4, 
+            YearsWithCurrManager = 2)
+
+myKnn2<-knn(Train,new.emp,dfNew[dfPartition, "Attrition"],k=floor(sqrt(nrow(Train))),prob=T)
+
+attr(myKnn2,"prob")
+
+```
+
+So the The probapility is 0.70 that he will stay.
+
+
+### 7. Step Seven
+
+
+In this step, I will do the 10 fold cross validation of the knn
+
+```{r}
+trn<-dfNew[dfPartition,]
+
+train_control <- trainControl(method="repeatedcv", number=10)
+
+grid <- expand.grid(.fL=c(0), .usekernel=c(FALSE))
+
+model <- train(Attrition~., data=trn, trControl=train_control, method="knn")
+
+```
+
+# This is just to summarize the  results
+```{r}
+print(model)
+plot(model)
+```
+
+
+
+### 8. Step Eight
+
+Now I will do the confusion matrix by transfering to factor first, then predict the model, then drawing the confusion matrix
+
+```{r}
+test_atr_factor <- as.factor(test_atr) # I need to transfer it first to factor 
+
+predClass <- predict(model, Test) # Predict the model
+
+confusionMatrix(predClass,test_atr_factor) # draw the confusion matrix 
+```
+
+Now lets explain the result of our confusion matrix. 
+
+**Sensitivity** : Here it means that given the attiration was NO, what is the probability that the model will make the correct decision $  p = 201/206 $
+
+**Specificity**: Here it means that given the attriration is YES, what is the probability that the model will say so : $ p = 14/57$
+
+
+
